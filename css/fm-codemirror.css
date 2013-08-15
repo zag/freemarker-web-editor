@@ -1,6 +1,6 @@
 /* BASICS */
 .CodeMirror {
-    height: 300px;
+    height: auto;
     background-color: white;
     font-size: 12px;
     /* Set height, width, borders, and global font properties here */
@@ -8,7 +8,8 @@
 }
 .CodeMirror-scroll {
     /* Set scrolling behaviour here */
-    overflow: auto;
+    overflow-y: hidden;
+    overflow-x: auto;
 }
 
 /* PADDING */
