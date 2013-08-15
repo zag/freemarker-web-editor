@@ -3,4 +3,7 @@ FreeMarkerWebEditor
 
 A web based FreeMarker editor.
 
-Depends heavily on CodeMirror for the underlying editor as well as PEG.js for parsing.
+Main features are syntax highlighting and auto-completion (Ctrl+Space).
+
+
+Depends heavily on [CodeMirror](http://codemirror.net/) for the underlying editor as well as [PEG.js](http://pegjs.majda.cz) for parsing.
