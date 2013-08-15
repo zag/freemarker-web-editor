@@ -42,87 +42,48 @@
         <h3>
 <a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+<p>Demo page for <a href="https://github.com/roded/freemarker-web-editor/">freemarker-web-editor</a>.</p>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
-</code></pre>
+<p>It is mostly helpful by highlighting FreeMarker syntax, offering auto-completion (<pre>ctrl + space</pre>), and quite simple validation;
+though more CodeMirror related features are available as well (highlighting, auto-tag close, bracket matching/completing, etc.)
+</p>
 
+<p>Built on <a href="http://codemirror.net">CodeMirror</a> and <a href="http://pegjs.majda.cz">PEG.js</a>
+</p>
 
-<div class="editbox" style="border-top: 1px solid black; border-bottom: 1px solid black;">
+<p>Keep in mind that not all FreeMarker tags and language features are implemented, have a look <a href="https://github.com/roded/freemarker-web-editor/">here</a> for code.
+</p>
+
 <textarea id="code">
-    Snipplet #1;
-    <table>
-        <#-- Get a list of all the property names for the document -->
-            <#assign props = document.properties?keys/>
-            <#list props as t>
-                <#-- If the property exists -->
-                    <#if document.properties[t]?exists>
-                        <#-- If it is a date, format it accordingly-->
-                            <#if document.properties[t]?is_date>
-                                <tr><td>${t} = ${document.properties[t]?date}</td></tr>
+<#compress>
+Hi,
+I am a FreeMarker web editor 
+        
+</#compress>
 
-                                <#-- If it is a boolean, format it accordingly-->
-                                    <#elseif document.properties[t]?is_boolean>
-                                        <tr><td>${t} = ${document.properties[t]?string("yes", "no")}</td></tr>
+<#-- Snippet #1 -->
+<#assign companycity = "Tel-Aviv"/>
+<b>Company Address:</b> ${companycity}
 
-                                        <#-- Otherwise treat it as a string -->
-                                            <#else>
-                                                <tr><td>${t} = ${document.properties[t]}</td></tr>
-                            </#if>
-                    </#if>
-            </#list>
-    </table>
-
-    Snipplet #2;
-    <table>
-        <#list userhome.children as child>
-            <#if child.isDocument>
-                <tr><td>${child.properties.name}</td></tr>
-                <#if child.mimetype = "text/plain">
-                    <tr><td style='padding-left:16px'>${child.content}</td></tr>
-                    <#elseif child.mimetype = "image/jpeg">
-                        <tr><td style='padding-left:16px'><img width=100 height=65 src="/alfresco${child.url}"><td></tr>
-                </#if>
-            </#if>
-        </#list>
-    </table>
-
-    Snipplet #3;
-    <table>
-        <tbody>
-        <tr>
-            <td><h1>Version History - ${space.name}<h1></td>
-        </tr>
-        </tbody>
-    </table>
-    <table>
-        <tbody>
-        <tr>
-            <th class="recordSetHeader"></th>
-            <th class="recordSetHeader">Creator</th>
-            <th class="recordSetHeader">Document</th>
-            <th class="recordSetHeader">Version</th>
-            <th class="recordSetHeader">Created Date</th>
-        </tr>
-        <#assign i = 0/>
-        <#list space.childrenByXPath[".//*[subtypeOf('cm:content')]"] as child>
-            <#if child.isDocument>
-                <#list child.versionHistory as record>
-                    <tr class="${(i % 2 = 0)?string("recordSetRow","recordSetRowAlt")}">
-                    <td style="padding: 2px; text-align: center;"><b>${i+1}</b></td>
-                    <td style="padding: 2px; text-align: center;">${record.creator}</td>
-                    <td style="padding: 2px; text-align: left;"><a href="/alfresco${record.url}" target="new">${record.name}</a></td>
-                    <td style="padding: 2px; text-align: center;">${record.versionLabel}</td>
-                    <td style="padding: 2px; text-align: center;">${record.createdDate?datetime}</td>
-                    </tr>
-                    <#assign i = i + 1 />
-                </#list>
-
-            </#if>
-        </#list>
-    </table>
+<#-- Snippet #2 -->
+<table>
+<#assign firstNames = ["Vincent", "Mia", "Butch", "Jules", "Marsellus"]/>
+<#assign lastNames = ["Vega", "Wallace", "Coolidge", "Winnfield", "Wallace"]/>
+<#list firstNames as first>
+    <tr>
+    <#list lastNames as last>
+        <td>${first}</td><td>${last}</td>
+        <#if firstNames?index_of(first) = lastNames?index_of(last)>
+            <#assign match = true/>
+        <#else>
+            <#assign match = false/>
+        </#if>
+        
+        <td>${match}</td>
+    </#list>
+    </tr>
+</#list>
+</table>
 
 </textarea>
 </div>
@@ -133,14 +94,13 @@ $ git checkout gh-pages
     });
 </script>
 
-
 </section>
     </div>
 
     <!-- FOOTER  -->
     <div id="footer_wrap" class="outer">
       <footer class="inner">
-        <p class="copyright">FreemarkerWebEditor maintained by <a href="https://github.com/roded">roded</a></p>
+        <p class="copyright">freemarker-web-editor maintained by <a href="https://github.com/roded">roded</a></p>
         <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
       </footer>
     </div>
