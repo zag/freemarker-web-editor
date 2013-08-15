@@ -1,0 +1,1122 @@
+	{
+		// Overriding clone for better performance.
+		// TODO, not needed after switch to PEGjs 0.8.0
+		clone = function (pos) {
+			return { 
+				offset: pos.offset, 
+				line: pos.line, 
+				column: pos.column, 
+				seenCR: pos.seenCR 
+			};
+		}
+
+		var connector = arguments[2];
+		var catchErrors = connector.getCatchErrors();
+
+		function catchError() {
+			return catchErrors;
+		}
+		
+		var tokenArr = connector.getTokenArray();
+		function getTokenNodeById(id) {
+			return tokenArr[id * 1];
+		}
+	}
+	
+	parserState =
+		tree:treeNode* 
+		EOF
+		{
+			var node = new SyntaxNode("parserState");
+			(tree !== undefined)? node.addChild(tree) : null;
+            connector.setAST(node);
+			return node;
+		}
+
+	treeNode =
+		PCDATA / fmComment / fmExpression / NEWLINE / directive
+
+	EOF = 
+	!. {
+	}
+
+	directive = 
+		assignDirective 
+		/ compressDirective
+		/ ifDirective
+		/ listDirective
+		/ &{return catchError();}
+		a: (TAG_OPEN / 
+			END_TAG)
+		b:tillTagClose
+		{
+			var node = new ErrorNode("InvalidDirective");
+			node.setErrorMessage("Invalid directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directives.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node;
+		}
+		/ &{return catchError();}
+		a: (ASSIGN_TAG / 
+			COMPRESS_TAG / 
+			LIST_TAG /
+			IF_TAG)
+			b:tillTagClose
+		{
+			var node = new ErrorNode("InvalidDirective");
+			node.setErrorMessage("Could not find matching close tag for directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directives.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node;
+		}
+		/ &{return catchError();}
+		a: (ELSE_IF_TAG /
+			ELSE_TAG)
+		b:tillTagClose
+		{
+			var node = new ErrorNode("InvalidDirective");
+			node.setErrorMessage("Directive is not in context");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directives.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node;
+		}
+		/ &{return catchError();}
+		a: (IF_CLOSE_TAG /
+			COMPRESS_CLOSE_TAG / 
+			LIST_CLOSE_TAG)
+		b:tillTagClose
+		{
+			var node = new ErrorNode("InvalidDirective");
+			node.setErrorMessage("Could not find matching open tag for directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directives.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node;
+		}
+
+	fmComment = 
+		a:COMMENT_OPEN b:(NEWLINE / FM_COMMENT_CONTENT)* c:COMMENT_CLOSE
+		{
+			var node = new SyntaxNode("fmComment");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:COMMENT_OPEN b:(NEWLINE / FM_COMMENT_CONTENT)*
+		{
+			var node = new ErrorNode("InvalidFreeMarkerComment");
+			node.setErrorMessage("Invalid FreeMarker comment");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/dgui_template_overallstructure.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node;
+		}
+
+	fmExpression = 
+		a:EXPRESSION_OPEN b:expression c:EXPRESSION_CLOSE
+		{
+			var node = new SyntaxNode("fmExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:EXPRESSION_OPEN b:fmExpressionErrorToken* c:EXPRESSION_CLOSE?
+		{
+			var node = new ErrorNode("InvalidFreeMarkerExpression");
+			node.setErrorMessage("Invalid FreeMarker expression");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/dgui_template_exp.html#dgui_template_exp_direct");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node;
+		}
+		
+	looseDirectiveEnd = 
+		TAG_CLOSE_SELF / TAG_CLOSE
+
+	assignDirective =
+		a:ASSIGN_TAG b:$__ c:identifierDefinition d:__ e:EQUALS f:__ g:expression h:__ i:looseDirectiveEnd
+		{
+			var node = new SyntaxNode("assignDirective");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			node.addChild(e);
+			node.addChild(f);
+			node.addChild(g);
+			node.addChild(h);
+			node.addChild(i);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:ASSIGN_TAG /*b:($__ identifierDefinition)? */c:tillTagClose
+		{
+			var node = new ErrorNode("assignDirective");
+			node.setErrorMessage("Invalid \"assign\" directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_assign.html");
+			node.addChild(a);
+			// node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	compressDirective = 
+		a:compressOpenTag
+		b:(!compressCloseTag treeNode)*
+		c:compressCloseTag
+		{
+			var node = new SyntaxNode("compressDirective");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:compressOpenTag
+		{
+			var node = new ErrorNode("compressDirective");
+			node.setErrorMessage("Invalid \"compress\" directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_compress.html");
+			node.addChild(a);
+			return node;
+		}
+
+	compressOpenTag = 
+		a:COMPRESS_TAG b:TAG_CLOSE
+		{
+			var node = new CompressDirectiveOpenTagNode("compressOpenTag");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:COMPRESS_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("compressOpenTag");
+			node.setErrorMessage("Invalid \"compress\" tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_compress.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	compressCloseTag = 
+		a:COMPRESS_CLOSE_TAG b:TAG_CLOSE_CLOSE
+		{
+			var node = new CompressCloseTagNode("compressCloseTag");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:COMPRESS_CLOSE_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("compressCloseTag");
+			node.setErrorMessage("Invalid \"compress\" close tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_compress.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	ifDirective =
+		a:ifDirectiveTag
+		b:(!ifDirectiveElseIfTag !ifDirectiveElseTag !ifCloseTag treeNode)*
+		c:(ifDirectiveElseIfTag (!ifDirectiveElseIfTag !ifDirectiveElseTag !ifCloseTag treeNode)*)*
+		d:(ifDirectiveElseTag (!ifCloseTag treeNode)*)?
+		e:ifCloseTag
+		{
+			var node = new SyntaxNode("ifDirective");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			node.addChild(e);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:ifDirectiveTag
+		b:(!ifDirectiveElseIfTag !ifDirectiveElseTag !ifCloseTag treeNode)*
+		c:(ifDirectiveElseIfTag (!ifDirectiveElseIfTag !ifDirectiveElseTag !ifCloseTag treeNode)*)*
+		d:(ifDirectiveElseTag (!ifCloseTag treeNode)*)?
+		{
+			var node = new ErrorNode("ifDirective");
+			node.setErrorMessage("Invalid \"if\" directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_if.html");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			return node;
+		}
+
+	ifDirectiveTag = 
+		a:IF_TAG b:$__ c:expression d:__ e:TAG_CLOSE
+		{
+			var node = new IfDirectiveOpenTagNode("ifDirectiveTag");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:IF_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("ifDirectiveTag");
+			node.setErrorMessage("Invalid \"if\" tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_if.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	ifDirectiveElseIfTag = 
+		a:ELSE_IF_TAG b:$__ c:expression d:__ e:TAG_CLOSE 
+		{
+			var node = new SyntaxNode("ifDirectiveElseIfTag");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:ELSE_IF_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("ifDirectiveElseIfTag");
+			node.setErrorMessage("Invalid \"elseif\" tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_if.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	ifDirectiveElseTag = 
+		a:ELSE_TAG b:TAG_CLOSE
+		{
+			var node = new IfDirectiveElseTagNode("ifDirectiveElseTag");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:ELSE_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("ifDirectiveElseTag");
+			node.setErrorMessage("Invalid \"else\" tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_if.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	ifCloseTag = 
+		a:IF_CLOSE_TAG b:TAG_CLOSE_CLOSE
+		{
+			var node = new IfCloseTagNode("ifCloseTag");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:IF_CLOSE_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("ifCloseTag");
+			node.setErrorMessage("Invalid \"if\" close tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_if.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	listDirective = 
+		a:listOpenTag
+		b:(!listCloseTag treeNode)*
+		c:listCloseTag
+		{
+			var node = new SyntaxNode("listDirective");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}	
+		/ &{return catchError();}
+		a:listOpenTag
+		{
+			var node = new ErrorNode("listDirective");
+			node.setErrorMessage("Invalid \"list\" directive");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_list.html");
+			node.addChild(a);
+			return node;
+		}
+
+	listOpenTag = 
+		a:LIST_TAG b:$__
+		c:expression d:__ e:AS f:__ g:listIdentifierDefinition h:__ i:TAG_CLOSE
+		{
+			var node = new ListDirectiveOpenTagNode("listOpenTag");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			node.addChild(e);
+			node.addChild(f);
+			node.addChild(g);
+			node.addChild(h);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:LIST_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("listOpenTag");
+			node.setErrorMessage("Invalid \"list\" tag");	
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_list.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	listCloseTag = 
+		a:LIST_CLOSE_TAG b:TAG_CLOSE_CLOSE
+		{
+			var node = new ListCloseTagNode("listCloseTag");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		a:LIST_CLOSE_TAG b:tillTagClose
+		{
+			var node = new ErrorNode("listCloseTag");
+			node.setErrorMessage("Invalid \"list\" close tag");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/ref_directive_list.html");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	//////
+
+	expression =
+		a:orExpression
+		{
+			var node = new SyntaxNode("expression");
+			node.addChild(a);
+			return node.fold();		
+		}
+		/ &{return catchError();}
+		a:inTagErrorTokens+
+		{
+			var node = new ErrorNode("ErrorExpression");
+			node.setErrorMessage("Invalid expression");		
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/dgui_template_exp.html");
+			node.addChild(a);
+			return node.fold();		
+		}
+
+	orExpression =
+		a:andExpression b:__ c:(OR __ andExpression)*
+		{
+			var node = new SyntaxNode("orExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	andExpression =
+		a:equalityExpression b:__ c:(AND __ equalityExpression)*
+		{
+			var node = new SyntaxNode("andExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	equalityExpression =
+		a:relationalExpression b:__ c:((NOT_EQUALS / DOUBLE_EQUALS / EQUALS) __ relationalExpression)?
+		{
+			var node = new SyntaxNode("equalityExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	relationalExpression =
+		a:rangeExpression b:__ c:((NATURAL_GTE / ESCAPED_GTE / NATURAL_GT / ESCAPED_GT / LESS_THAN_EQUALS / LESS_THAN) __ rangeExpression)?
+		{
+			var node = new SyntaxNode("relationalExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	rangeExpression =
+		a:additiveExpression b:__ c:(DOT_DOT __ additiveExpression)?
+		{
+			var node = new SyntaxNode("rangeExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	additiveExpression =
+		a:multiplicativeExpression b:__ c:((PLUS / MINUS) __ multiplicativeExpression)*
+		{
+			var node = new SyntaxNode("additiveExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	multiplicativeExpression =
+		a:unaryExpression b:__ c:((TIMES / DIVIDE / PERCENT) __ unaryExpression)*
+		{
+			var node = new SyntaxNode("multiplicativeExpression");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	unaryExpression =
+		ws1:__ exp:(unaryPlusMinusExpression / notExpression / primaryExpression) ws2:__
+		{
+			var node = new SyntaxNode("unaryExpression");
+			node.addChild(ws1);
+			node.addChild(exp);
+			node.addChild(ws2);
+			return node.fold();	
+		}
+
+	unaryPlusMinusExpression =
+		a:(PLUS / MINUS) b:primaryExpression
+		{
+			var node = new SyntaxNode("unaryPlusMinusExpression");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	notExpression =
+		a:EXCLAM+ b:primaryExpression
+		{
+			var node = new SyntaxNode("notExpression");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	primaryExpression =
+		(
+			a:(NUMBER_LITERAL
+			/ hashLiteral
+			/ listLiteral
+			/ stringLiteral
+			/ parenthesis
+			/ booleanLiteral
+			/ superIdentifier)
+			b:(addSubExpression)*
+		)
+		{
+			var node = new SyntaxNode("primaryExpression");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	addSubExpression =
+		//dotVariable
+		dynamicKey
+		/ methodArgs
+		/ builtIn
+		/ defaultTo
+		/ exists
+
+	exists =
+		EXISTS
+
+	dynamicKey =
+		a:OPEN_BRACKET b:expression c:CLOSE_BRACKET
+		{
+			var node = new SyntaxNode("dynamicKey");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	methodArgs =
+		a:OPEN_PAREN b:positionalArgs c:CLOSE_PAREN
+		{
+			var node = new SyntaxNode("methodArgs");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	builtIn =
+		a:BUILT_IN b:builtInOption
+		{
+			var node = new SyntaxNode("builtIn");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	defaultTo =
+		a:(terminatingExclam / EXCLAM) b:expression
+		{
+			var node = new SyntaxNode("defaultTo");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	identifierDefinition "identifierDefinition" = 
+		ws1:_ ident:IDENTIFIER ws2:_ 
+		{
+			var identName = ident.text;
+			// markIdent(identName);		
+			var node = new IdentifierDefinitionNode("identifierDefinition", identName);
+			node.addChild(ident);
+			return node;
+		}
+
+	listIdentifierDefinition "listIdentifierDefinition" = 
+		ws1:_ ident:IDENTIFIER ws2:_ 
+		{
+			var identName = ident.text;
+			// pushListIdentifier(identName);		
+			var node = new ListIdentifierDefinitionNode("listIdentifierDefinition", identName);			
+			return node;
+		}
+	
+	superIdentifier = 
+		identifier
+	
+	identifier "identifier" = 
+		ws1:_ ident:IDENTIFIER ws2:_ 
+		{
+			var identName = ident.text;
+			var node = new IdentifierNode("identifier", identName);					
+			node.addChild(ident);
+			return node;
+		}
+	
+	listLiteral =
+		a:OPEN_BRACKET b:positionalArgs c:CLOSE_BRACKET
+		{
+			var node = new SyntaxNode("listLiteral");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+	positionalArgs =
+		a:expression b:(COMMA expression)*
+		{
+			var node = new SyntaxNode("positionalArgs");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	parenthesis =
+		a:OPEN_PAREN b:expression c:CLOSE_PAREN
+		{
+			var node = new SyntaxNode("parenthesis");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+
+
+	hashLiteral =
+		a:OPEN_BRACE b:expression c:hashLiteralElement d:(COMMA expression hashLiteralElement)* e:CLOSE_BRACE
+		{
+			var node = new SyntaxNode("hashLiteral");
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			node.addChild(d);
+			node.addChild(e);
+			return node.fold();
+		}
+
+	// TODO, this builds a sucky tree (watch out for left recur)
+	hashLiteralElement =
+		a:(COMMA / COLON) b:expression
+		{
+			var node = new SyntaxNode("hashLiteralElement");
+			node.addChild(a);
+			node.addChild(b);
+			return node.fold();
+		}
+
+	terminatingExclam = 
+		ws1:_ name:(EXCLAM $__) ws2:_
+		{
+			return new SyntaxNode("terminatingExclam");
+		}
+		
+	builtInOption "builtInOption" = 
+		builtin:IDENTIFIER
+		{	
+			var node = new SyntaxNode("builtInOption");
+			return node.fold();
+		}
+
+	stringLiteral =
+		ws:_ a:STRING_START b:(NEWLINE / stringContent)* c:STRING_END
+		{
+			var node = new SyntaxNode("stringLiteral");
+			node.addChild(ws);
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node.fold();
+		}
+		/ &{return catchError();}
+		ws:_ a:STRING_START b:stringErrorToken* c:STRING_END?
+		{
+			var node = new ErrorNode("InvalidStringLiteral");
+			node.setErrorMessage("Invalid string literal");
+			node.setHelpLink("http://freemarker.sourceforge.net/docs/dgui_template_exp.html#dgui_template_exp_direct_string");
+			node.addChild(ws);
+			node.addChild(a);
+			node.addChild(b);
+			node.addChild(c);
+			return node;
+		}
+		
+
+	booleanLiteral =
+		TRUE / FALSE
+
+	stringContent = 
+		STRING_SEQ_MATCH / ESCAPED_CHAR
+
+	// Error handling rules
+	stringErrorToken = 
+		(!STRING_END) tok:stringContent
+
+	fmExpressionErrorToken = 
+		(!EXPRESSION_CLOSE) tok:anyToken
+
+	inTagErrorTokens = 
+		tok:anyToken
+		{
+			if (tok.isInstanceOf(FMTokenNode)) {
+				return null;
+			}
+			else {
+				return tok;	
+			}			
+		}
+
+	tillTagClose = 
+		(!TAG_CLOSE !TAG_CLOSE_SELF !TAG_CLOSE_CLOSE anyToken)* 
+		(TAG_CLOSE / TAG_CLOSE_SELF / TAG_CLOSE_CLOSE)?
+
+	anyToken = 
+		"<" (!"-" .)+ "-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	_ = a:WS*
+		{
+			var node = new SyntaxNode("_");
+			node.addChild(a);
+			return node;
+		}
+
+	__ = a:$__*
+		{
+			// Avoiding AST overpopulation
+			if (a.length == 0)  {
+				return "";
+			}
+			else {
+				var node = new SyntaxNode("__");
+				node.addChild(a);
+				return node.fold();
+			}
+		}
+
+	$__ = a:(WS / NEWLINE)+
+		{
+			var node = new SyntaxNode("$__");
+			node.addChild(a);
+			return node;
+
+		}
+
+	WS "WS" = "<WS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	NUMBER_LITERAL "NUMBER_LITERAL" = "<NUMBER_LITERAL-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	FM_COMMENT_CONTENT "FM_COMMENT_CONTENT" = "<FM_COMMENT_CONTENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	NEWLINE "NEWLINE" = "<NEWLINE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	PCDATA "PCDATA" = "<PCDATA-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	IDENTIFIER "IDENTIFIER" = "<IDENTIFIER-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ESCAPED_CHAR "ESCAPED_CHAR" = "<ESCAPED_CHAR-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	STRING_START "STRING_START" = "<STRING_START-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	STRING_SEQ_MATCH "STRING_SEQ_MATCH" = "<STRING_SEQ_MATCH-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	STRING_END "STRING_END" = "<STRING_END-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TAG_OPEN "TAG_OPEN" = "<TAG_OPEN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ASSIGN_TAG "ASSIGN_TAG" = "<ASSIGN_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COMPRESS_TAG "COMPRESS_TAG" = "<COMPRESS_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	LIST_TAG "LIST_TAG" = "<LIST_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	IF_TAG "IF_TAG" = "<IF_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ELSE_IF_TAG "ELSE_IF_TAG" = "<ELSE_IF_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ELSE_TAG "ELSE_TAG" = "<ELSE_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	LIST_CLOSE_TAG "LIST_CLOSE_TAG" = "<LIST_CLOSE_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	IF_CLOSE_TAG "IF_CLOSE_TAG" = "<IF_CLOSE_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COMPRESS_CLOSE_TAG "COMPRESS_CLOSE_TAG" = "<COMPRESS_CLOSE_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	END_TAG "END_TAG" = "<END_TAG-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TAG_CLOSE_CLOSE "TAG_CLOSE_CLOSE" = "<TAG_CLOSE_CLOSE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TAG_CLOSE "TAG_CLOSE" = "<TAG_CLOSE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TAG_CLOSE_SELF "TAG_CLOSE_SELF" = "<TAG_CLOSE_SELF-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COMMENT_OPEN "COMMENT_OPEN" = "<COMMENT_OPEN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COMMENT_CLOSE "COMMENT_CLOSE" = "<COMMENT_CLOSE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	EXPRESSION_OPEN "EXPRESSION_OPEN" = "<EXPRESSION_OPEN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	EXPRESSION_CLOSE "EXPRESSION_CLOSE" = "<EXPRESSION_CLOSE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ANY_CHAR "ANY_CHAR" = "<ANY_CHAR-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	EQUALS "EQUALS" = "<EQUALS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	LESS_THAN "LESS_THAN" = "<LESS_THAN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	LESS_THAN_EQUALS "LESS_THAN_EQUALS" = "<LESS_THAN_EQUALS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ESCAPED_GT "ESCAPED_GT" = "<ESCAPED_GT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	ESCAPED_GTE "ESCAPED_GTE" = "<ESCAPED_GTE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	OPEN_PAREN "OPEN_PAREN" = "<OPEN_PAREN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	CLOSE_PAREN "CLOSE_PAREN" = "<CLOSE_PAREN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	OPEN_BRACKET "OPEN_BRACKET" = "<OPEN_BRACKET-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	CLOSE_BRACKET "CLOSE_BRACKET" = "<CLOSE_BRACKET-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	OPEN_BRACE "OPEN_BRACE" = "<OPEN_BRACE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	CLOSE_BRACE "CLOSE_BRACE" = "<CLOSE_BRACE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COMMA "COMMA" = "<COMMA-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	SEMICOLON "SEMICOLON" = "<SEMICOLON-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	COLON "COLON" = "<COLON-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DOT "DOT" = "<DOT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DOT_DOT "DOT_DOT" = "<DOT_DOT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DOUBLE_STAR "DOUBLE_STAR" = "<DOUBLE_STAR-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	EXCLAM "EXCLAM" = "<EXCLAM-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	PLUS "PLUS" = "<PLUS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	MINUS "MINUS" = "<MINUS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TIMES "TIMES" = "<TIMES-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DIVIDE "DIVIDE" = "<DIVIDE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	PERCENT "PERCENT" = "<PERCENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	BUILT_IN "BUILT_IN" = "<BUILT_IN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	EXISTS "EXISTS" = "<EXISTS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	NATURAL_GT "NATURAL_GT" = "<NATURAL_GT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	NATURAL_GTE "NATURAL_GTE" = "<NATURAL_GTE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DOUBLE_EQUALS "DOUBLE_EQUALS" = "<DOUBLE_EQUALS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	NOT_EQUALS "NOT_EQUALS" = "<NOT_EQUALS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	AND "AND" = "<AND-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	OR "OR" = "<OR-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	IN "IN" = "<IN-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	AS "AS" = "<AS-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	USING "USING" = "<USING-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	FALSE "FALSE" = "<FALSE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	TRUE "TRUE" = "<TRUE-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	DATE_UTILS_IDENT "DATE_UTILS_IDENT" = "<DATE_UTILS_IDENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	MARKET_DATA_IDENT "MARKET_DATA_IDENT" = "<MARKET_DATA_IDENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	REPORT_DATA_IDENT "REPORT_DATA_IDENT" = "<REPORT_DATA_IDENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	BUNDLE_IDENT "BUNDLE_IDENT" = "<BUNDLE_IDENT-" id:index ">"
+		{
+			return getTokenNodeById(id);
+		}
+
+	index "index" = 
+		a:[0-9]+
+		{
+			return a.join("");
+		}

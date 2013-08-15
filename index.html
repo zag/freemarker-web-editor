@@ -8,6 +8,14 @@
 
     <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
 
+ 	<link rel="stylesheet" href="css/fm-editor.css"/>
+    <link rel="stylesheet" href="css/fm-codemirror.css"/>
+    <link rel="stylesheet" href="css/fm-hint.css"/>
+    <link rel="stylesheet" href="css/fm-syntax.css"/>
+    <script src="js/codemirror-3.0-bin/codemirror-compressed.js"></script>
+    <script src="js/dojo-1.9.1-bin/dojo.js" data-dojo-config="async: true"></script>
+
+
     <title>freemarker-web-editor</title>
   </head>
 
@@ -41,28 +49,92 @@ $ git fetch origin
 $ git checkout gh-pages
 </code></pre>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
 
-<h3>
-<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Designer Templates</h3>
+<div class="editbox" style="border-top: 1px solid black; border-bottom: 1px solid black;">
+<textarea id="code">
+    Snipplet #1;
+    <table>
+        <#-- Get a list of all the property names for the document -->
+            <#assign props = document.properties?keys/>
+            <#list props as t>
+                <#-- If the property exists -->
+                    <#if document.properties[t]?exists>
+                        <#-- If it is a date, format it accordingly-->
+                            <#if document.properties[t]?is_date>
+                                <tr><td>${t} = ${document.properties[t]?date}</td></tr>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+                                <#-- If it is a boolean, format it accordingly-->
+                                    <#elseif document.properties[t]?is_boolean>
+                                        <tr><td>${t} = ${document.properties[t]?string("yes", "no")}</td></tr>
 
-<h3>
-<a name="rather-drive-stick" class="anchor" href="#rather-drive-stick"><span class="octicon octicon-link"></span></a>Rather Drive Stick?</h3>
+                                        <#-- Otherwise treat it as a string -->
+                                            <#else>
+                                                <tr><td>${t} = ${document.properties[t]}</td></tr>
+                            </#if>
+                    </#if>
+            </#list>
+    </table>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+    Snipplet #2;
+    <table>
+        <#list userhome.children as child>
+            <#if child.isDocument>
+                <tr><td>${child.properties.name}</td></tr>
+                <#if child.mimetype = "text/plain">
+                    <tr><td style='padding-left:16px'>${child.content}</td></tr>
+                    <#elseif child.mimetype = "image/jpeg">
+                        <tr><td style='padding-left:16px'><img width=100 height=65 src="/alfresco${child.url}"><td></tr>
+                </#if>
+            </#if>
+        </#list>
+    </table>
 
-<h3>
-<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+    Snipplet #3;
+    <table>
+        <tbody>
+        <tr>
+            <td><h1>Version History - ${space.name}<h1></td>
+        </tr>
+        </tbody>
+    </table>
+    <table>
+        <tbody>
+        <tr>
+            <th class="recordSetHeader"></th>
+            <th class="recordSetHeader">Creator</th>
+            <th class="recordSetHeader">Document</th>
+            <th class="recordSetHeader">Version</th>
+            <th class="recordSetHeader">Created Date</th>
+        </tr>
+        <#assign i = 0/>
+        <#list space.childrenByXPath[".//*[subtypeOf('cm:content')]"] as child>
+            <#if child.isDocument>
+                <#list child.versionHistory as record>
+                    <tr class="${(i % 2 = 0)?string("recordSetRow","recordSetRowAlt")}">
+                    <td style="padding: 2px; text-align: center;"><b>${i+1}</b></td>
+                    <td style="padding: 2px; text-align: center;">${record.creator}</td>
+                    <td style="padding: 2px; text-align: left;"><a href="/alfresco${record.url}" target="new">${record.name}</a></td>
+                    <td style="padding: 2px; text-align: center;">${record.versionLabel}</td>
+                    <td style="padding: 2px; text-align: center;">${record.createdDate?datetime}</td>
+                    </tr>
+                    <#assign i = i + 1 />
+                </#list>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+            </#if>
+        </#list>
+    </table>
 
-<h3>
-<a name="support-or-contact" class="anchor" href="#support-or-contact"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+</textarea>
+</div>
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
-      </section>
+<script type="text/javascript">
+    require([ "fm/fm-editor" ], function () {
+        var editor = new FreeMarkerEditor(code);
+    });
+</script>
+
+
+</section>
     </div>
 
     <!-- FOOTER  -->

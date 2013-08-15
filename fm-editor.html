@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FreeMarker Web Editor</title>
+
+    <link rel="stylesheet" href="css/fm-editor.css"/>
+    <link rel="stylesheet" href="css/fm-codemirror.css"/>
+    <link rel="stylesheet" href="css/fm-hint.css"/>
+    <link rel="stylesheet" href="css/fm-syntax.css"/>
+    <script src="js/codemirror-3.0-bin/codemirror-compressed.js"></script>
+    <script src="js/dojo-1.9.1-bin/dojo.js" data-dojo-config="async: true"></script>
+
+</head>
+<body class="editbox">
+<div class="editbox" style="border-top: 1px solid black; border-bottom: 1px solid black;">
+<textarea id="code">
+   <#compress>
+    Hi,
+    I am a FreeMarker web editor built on the great CodeMirror (http://codemirror.net) and the impressive PEG.js (http://pegjs.majda.cz).
+    
+    I'm mostly helpful by highlighting FreeMarker syntax, offering auto-completion (ctrl + space), and quite simple validation.
+    though more CodeMirror related features are available as well (highlighting, auto-tag close, bracket matching/completing, etc.)
+    
+    Please keep in mind that not all FreeMarker tags and language features are implemented, have a look at my code @ roded.github.com if interested.
+</#compress>
+
+<#-- Snippet #1 -->
+<#assign companycity = "Tel-Aviv"/>
+<b>Company Address:</b> ${companycity}
+
+<#-- Snippet #2 -->
+<table>
+<#assign firstNames = ["Vincent", "Mia", "Butch", "Jules", "Marsellus"]/>
+<#assign lastNames = ["Vega", "Wallace", "Coolidge", "Winnfield", "Wallace"]/>
+<#list firstNames as first>
+    <tr>
+    <#list lastNames as last>
+        <td>${first}</td><td>${last}</td>
+        <#if firstNames?index_of(first) = lastNames?index_of(last)>
+            <#assign match = true/>
+        <#else>
+            <#assign match = false/>
+        </#if>
+        
+        <td>${match}</td>
+    </#list>
+    </tr>
+</#list>
+</table>
+
+
+</textarea>
+</div>
+
+<br>
+
+Hi,<br>
+The above is an implementation of a FreeMarker web editor.<br>
+It mostly relies on <a href="http://codemirror.net/">CodeMirror</a> as the editor base and <a href="http://pegjs.majda.cz/">PEG.js</a> for parsing.<br>
+<br>
+All examples, with some modifications, are from: <a href="http://wiki.alfresco.com/wiki/FreeMarker_Template_Cookbook">The FreeMarker Template Cookbook</a><br>
+
+
+<script type="text/javascript">
+    require([ "fm/fm-editor" ], function () {
+        var editor = new FreeMarkerEditor(code);
+    });
+</script>
+</body>
+</html>
