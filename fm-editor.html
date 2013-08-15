@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FreeMarker Web Editor</title>
+    <title>freemarker-web-editor</title>
 
     <link rel="stylesheet" href="css/fm-editor.css"/>
     <link rel="stylesheet" href="css/fm-codemirror.css"/>
@@ -27,12 +27,10 @@ though more CodeMirror related features are available as well (highlighting, aut
 </p>
 
 <textarea id="code">
-   <#compress>
-    Hi,
-    I am a FreeMarker web editor 
-    
-    
-    
+<#compress>
+Hi,
+I am a FreeMarker web editor 
+        
 </#compress>
 
 <#-- Snippet #1 -->
@@ -62,15 +60,6 @@ though more CodeMirror related features are available as well (highlighting, aut
 
 </textarea>
 </div>
-
-<br>
-
-Hi,<br>
-The above is an implementation of a FreeMarker web editor.<br>
-It mostly relies on <a href="http://codemirror.net/">CodeMirror</a> as the editor base and <a href="http://pegjs.majda.cz/">PEG.js</a> for parsing.<br>
-<br>
-All examples, with some modifications, are from: <a href="http://wiki.alfresco.com/wiki/FreeMarker_Template_Cookbook">The FreeMarker Template Cookbook</a><br>
-
 
 <script type="text/javascript">
     require([ "fm/fm-editor" ], function () {
