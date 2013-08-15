@@ -1,0 +1,114 @@
+span.cm-ANY_CHAR
+{
+    /*    background-image: url("../images/squiggle.gif");
+        background-repeat: repeat-x;
+        background-position: left bottom;
+        padding-bottom: 2px;
+        vertical-align: text-top;
+        font-style: italic;*/
+    color: red;
+    text-decoration: line-through;
+}
+
+span.cm-PCDATA {
+    color: #7d7c80;
+}
+
+span.cm-EXPRESSION_OPEN,
+span.cm-EXPRESSION_CLOSE,
+span.cm-TAG_OPEN,
+span.cm-ASSIGN_TAG,
+span.cm-COMPRESS_TAG,
+span.cm-ELSE_IF_TAG,
+span.cm-ELSE_TAG,
+span.cm-IF_TAG,
+span.cm-IF_CLOSE_TAG,
+span.cm-COMPRESS_CLOSE_TAG,
+span.cm-LIST_TAG,
+span.cm-LIST_CLOSE_TAG,
+span.cm-END_TAG,
+span.cm-TAG_CLOSE,
+span.cm-TAG_CLOSE_CLOSE,
+span.cm-TAG_CLOSE_SELF
+{
+    color: #4192ff;
+}
+
+span.cm-NOT-FOUND {
+    background-color: #ffdcd4;
+}
+
+span.cm-EQUALS,
+span.cm-LESS_THAN,
+span.cm-LESS_THAN_EQUALS,
+span.cm-ESCAPED_GT,
+span.cm-ESCAPED_GTE,
+span.cm-NATURAL_GT,
+span.cm-NATURAL_GTE,
+span.cm-PLUS,
+span.cm-MINUS,
+span.cm-TIMES,
+span.cm-DIVIDE,
+span.cm-PERCENT,
+span.cm-BUILT_IN,
+span.cm-EXISTS,
+span.cm-DOT,
+span.cm-DOUBLE_EQUALS,
+span.cm-AND,
+span.cm-OR,
+span.cm-NOT_EQUALS
+{
+    color: #666666;
+}
+
+span.cm-OPEN_PAREN,
+span.cm-CLOSE_PAREN,
+span.cm-OPEN_BRACKET,
+span.cm-CLOSE_BRACKET,
+span.cm-OPEN_BRACE,
+span.cm-CLOSE_BRACE,
+span.cm-COMMA,
+span.cm-SEMICOLON,
+span.cm-COLON,
+span.cm-DOT_DOT,
+span.cm-DOUBLE_STAR
+{
+    color: #CF7EA9;
+}
+
+span.cm-IN,
+span.cm-AS,
+span.cm-USING,
+span.cm-FALSE,
+span.cm-TRUE
+{
+    color: #181788;
+}
+
+span.cm-NUMBER_LITERAL
+{
+    color: #e35c0e;
+}
+
+span.cm-FM_COMMENT_CONTENT,
+span.cm-COMMENT_OPEN,
+span.cm-COMMENT_CLOSE
+{
+    color: #a9e3a1;
+}
+
+span.cm-STRING_START,
+span.cm-STRING_SEQ_MATCH,
+span.cm-STRING_END
+{
+    color: #25b616;
+}
+
+span.cm-ESCAPED_CHAR {
+    color: #3300aa;
+}
+
+span.cm-IDENTIFIER
+{
+    color: #8d0bce;
+}

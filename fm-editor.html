@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FreeMarker Web Editor</title>
+
+    <link rel="stylesheet" href="css/fm-editor.css"/>
+    <link rel="stylesheet" href="css/fm-codemirror.css"/>
+    <link rel="stylesheet" href="css/fm-hint.css"/>
+    <link rel="stylesheet" href="css/fm-syntax.css"/>
+    <script src="js/codemirror-3.0-bin/codemirror-compressed.js"></script>
+    <script src="js/dojo-1.9.1-bin/dojo.js" data-dojo-config="async: true"></script>
+
+</head>
+<body class="editbox">
+<div class="editbox" style="border-top: 1px solid black; border-bottom: 1px solid black;">
+<textarea id="code">
+    Snipplet #1;
+    <table>
+        <#-- Get a list of all the property names for the document -->
+            <#assign props = document.properties?keys/>
+            <#list props as t>
+                <#-- If the property exists -->
+                    <#if document.properties[t]?exists>
+                        <#-- If it is a date, format it accordingly-->
+                            <#if document.properties[t]?is_date>
+                                <tr><td>${t} = ${document.properties[t]?date}</td></tr>
+
+                                <#-- If it is a boolean, format it accordingly-->
+                                    <#elseif document.properties[t]?is_boolean>
+                                        <tr><td>${t} = ${document.properties[t]?string("yes", "no")}</td></tr>
+
+                                        <#-- Otherwise treat it as a string -->
+                                            <#else>
+                                                <tr><td>${t} = ${document.properties[t]}</td></tr>
+                            </#if>
+                    </#if>
+            </#list>
+    </table>
+
+    Snipplet #2;
+    <table>
+        <#list userhome.children as child>
+            <#if child.isDocument>
+                <tr><td>${child.properties.name}</td></tr>
+                <#if child.mimetype = "text/plain">
+                    <tr><td style='padding-left:16px'>${child.content}</td></tr>
+                    <#elseif child.mimetype = "image/jpeg">
+                        <tr><td style='padding-left:16px'><img width=100 height=65 src="/alfresco${child.url}"><td></tr>
+                </#if>
+            </#if>
+        </#list>
+    </table>
+
+    Snipplet #3;
+    <table>
+        <tbody>
+        <tr>
+            <td><h1>Version History - ${space.name}<h1></td>
+        </tr>
+        </tbody>
+    </table>
+    <table>
+        <tbody>
+        <tr>
+            <th class="recordSetHeader"></th>
+            <th class="recordSetHeader">Creator</th>
+            <th class="recordSetHeader">Document</th>
+            <th class="recordSetHeader">Version</th>
+            <th class="recordSetHeader">Created Date</th>
+        </tr>
+        <#assign i = 0/>
+        <#list space.childrenByXPath[".//*[subtypeOf('cm:content')]"] as child>
+            <#if child.isDocument>
+                <#list child.versionHistory as record>
+                    <tr class="${(i % 2 = 0)?string("recordSetRow","recordSetRowAlt")}">
+                    <td style="padding: 2px; text-align: center;"><b>${i+1}</b></td>
+                    <td style="padding: 2px; text-align: center;">${record.creator}</td>
+                    <td style="padding: 2px; text-align: left;"><a href="/alfresco${record.url}" target="new">${record.name}</a></td>
+                    <td style="padding: 2px; text-align: center;">${record.versionLabel}</td>
+                    <td style="padding: 2px; text-align: center;">${record.createdDate?datetime}</td>
+                    </tr>
+                    <#assign i = i + 1 />
+                </#list>
+
+            </#if>
+        </#list>
+    </table>
+
+</textarea>
+</div>
+
+<br>
+
+Hi,<br>
+The above is an implementation of a FreeMarker web editor.<br>
+It mostly relies on <a href="http://codemirror.net/">CodeMirror</a> as the editor base and <a href="http://pegjs.majda.cz/">PEG.js</a> for parsing.<br>
+<br>
+All examples, with some modifications, are from: <a href="http://wiki.alfresco.com/wiki/FreeMarker_Template_Cookbook">The FreeMarker Template Cookbook</a><br>
+
+
+<script type="text/javascript">
+    require([ "fm/fm-editor" ], function () {
+        var editor = new FreeMarkerEditor(code);
+    });
+</script>
+</body>
+</html>

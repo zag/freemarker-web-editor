@@ -1,0 +1,641 @@
+	{
+		// Overriding clone for better performance.
+		// TODO, not needed after switch to PEGjs 0.8.0
+		clone = function (pos) {
+			return { 
+				offset: pos.offset, 
+				line: pos.line, 
+				column: pos.column, 
+				seenCR: pos.seenCR 
+			};
+		}
+
+		var connector = arguments[2];
+
+		if (connector.getStateStack().length == 0) {
+		    connector.pushState(State.STATE_PCDATA); // init mode
+		}
+
+		function pushState(newState) {
+		    connector.pushState(newState);
+		}
+
+		function popState(expectedPop) {
+		    connector.popState(expectedPop);
+		}
+
+		function peekState() {
+			return connector.peekState();
+		}
+		
+		function checkState(state) {
+			return connector.checkState(state);
+		}
+
+		function checkSuperState(state) {
+			return connector.checkSuperState(state);
+		}		
+	}
+	
+	lexerState =
+		nodes:(NEWLINE / PCDATA / lexerStateFMTokens)* 
+		{
+			return nodes;
+		}
+
+	lexerStateFMTokens =
+		//
+		COMMENT_OPEN
+		/ FM_COMMENT_CONTENT
+		/ COMMENT_CLOSE
+		/ EXPRESSION_OPEN
+		/ EXPRESSION_CLOSE
+		//
+		/ STRING_START
+		/ ESCAPED_CHAR
+		/ STRING_SEQ_MATCH
+		/ STRING_END
+		//
+		/ ASSIGN_TAG
+		/ COMPRESS_TAG
+		/ LIST_TAG
+		/ IF_TAG
+		/ ELSE_IF_TAG
+		/ ELSE_TAG
+		/ TAG_OPEN // Last open token, because tags before it have precedence
+		//
+		/ IF_CLOSE_TAG
+		/ COMPRESS_CLOSE_TAG
+		/ LIST_CLOSE_TAG
+		/ END_TAG
+		//
+		/ NATURAL_GT
+		/ NATURAL_GTE
+		/ TAG_CLOSE_CLOSE
+		/ TAG_CLOSE
+		/ TAG_CLOSE_SELF
+		//
+		/ DOUBLE_EQUALS
+		/ EQUALS
+		/ LESS_THAN
+		/ LESS_THAN_EQUALS
+		/ ESCAPED_GT
+		/ ESCAPED_GTE
+		/ OPEN_PAREN
+		/ CLOSE_PAREN
+		/ OPEN_BRACKET
+		/ CLOSE_BRACKET
+		/ OPEN_BRACE
+		/ CLOSE_BRACE
+		//
+		/ COMMA
+		/ SEMICOLON
+		/ COLON
+		/ DOT_DOT
+		/ DOT
+		/ NOT_EQUALS
+		/ EXCLAM
+		/ PLUS
+		/ MINUS
+		/ DOUBLE_STAR
+		/ TIMES
+		/ DIVIDE
+		/ PERCENT
+		/ BUILT_IN
+		/ EXISTS
+		/ AND
+		/ OR
+		//
+		// *** KEYWORDS ***
+		/ FALSE
+		/ TRUE
+		/ IN
+		/ AS
+		/ USING
+		//
+		/ IDENTIFIER
+		/ NUMBER_LITERAL
+		/ NEWLINE
+		/ WS
+		//
+		/ ANY_CHAR
+
+	// Lexer Tokens
+
+	IDENTIFIER "IDENTIFIER" =
+		first:LETTER rest:(LETTER / DIGIT)*
+		{
+			var identName = first + rest.join("");
+			return new TokenNode("IDENTIFIER", identName, offset, line, column);			
+		}
+
+	COMMENT_OPEN = 
+		&{return (checkState(State.STATE_PCDATA))}
+		name:"<#--"
+		{
+			pushState(State.STATE_COMMENT);
+			return new FMTokenNode("COMMENT_OPEN", name, offset, line, column);
+		}
+	
+	FM_COMMENT_CONTENT = 
+		&{return (checkState(State.STATE_COMMENT))} 
+		a:FM_COMMENT_MATCH+
+		{
+			return new TokenNode("FM_COMMENT_CONTENT", a.join(""), offset, line, column);
+		}
+
+	FM_COMMENT_MATCH = 
+		a:(!'-->' !'\n' .)
+		{
+			return a.join("");
+		}
+
+	COMMENT_CLOSE = 
+		&{return (checkState(State.STATE_COMMENT))}
+		name:"-->"
+		{
+			popState(State.STATE_COMMENT);
+			return new FMTokenNode("COMMENT_CLOSE", name, offset, line, column);
+		}
+
+	EXPRESSION_OPEN = 
+		&{return (checkState(State.STATE_PCDATA))}
+		name:"${"
+		{
+			pushState(State.STATE_EXPRESSION);
+			return new FMTokenNode("EXPRESSION_OPEN", name, offset, line, column);
+		}
+		
+	EXPRESSION_CLOSE = 
+		&{return (checkState(State.STATE_EXPRESSION))}
+		name:"}"
+		{
+			popState(State.STATE_EXPRESSION);
+			return new FMTokenNode("EXPRESSION_CLOSE", name, offset, line, column);
+		}
+
+	ASSIGN_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"assign"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("ASSIGN_TAG", tag + name, offset, line, column);
+		}
+
+	COMPRESS_TAG = 
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"compress"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("COMPRESS_TAG", tag + name, offset, line, column);
+		}
+
+	LIST_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"list"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("LIST_TAG", tag + name, offset, line, column);
+		}
+
+	IF_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"if"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("IF_TAG", tag + name, offset, line, column);
+		}
+
+	ELSE_IF_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"elseif"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("ELSE_IF_TAG", tag + name, offset, line, column);
+		}
+
+	ELSE_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"<#" name:"else"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("ELSE_TAG", tag + name, offset, line, column);
+		}
+
+	TAG_OPEN =
+		&{return (checkState(State.STATE_PCDATA))}
+		name:"<#"
+		{
+			pushState(State.STATE_TAG);
+			return new FMTokenNode("TAG_OPEN", name, offset, line, column);
+		}
+
+	LIST_CLOSE_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"</#" name:"list"
+		{
+			pushState(State.STATE_CLOSE_TAG);
+			return new FMTokenNode("LIST_CLOSE_TAG", tag + name, offset, line, column);
+		}
+
+	IF_CLOSE_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"</#" name:"if"
+		{
+			pushState(State.STATE_CLOSE_TAG);
+			return new FMTokenNode("IF_CLOSE_TAG", tag + name, offset, line, column);
+		}
+
+	COMPRESS_CLOSE_TAG =
+		&{return (checkState(State.STATE_PCDATA))}
+		tag:"</#" name:"compress"
+		{
+			pushState(State.STATE_CLOSE_TAG);
+			return new FMTokenNode("COMPRESS_CLOSE_TAG", tag + name, offset, line, column);
+		}
+
+	END_TAG = tag:"</#"
+		&{return (checkState(State.STATE_PCDATA))}
+		{
+			pushState(State.STATE_CLOSE_TAG);
+			return new FMTokenNode("END_TAG", tag, offset, line, column);
+		}
+
+	TAG_CLOSE_CLOSE = 
+		&{return (checkState(State.STATE_CLOSE_TAG))}
+		name:">"
+		{
+			popState(State.STATE_CLOSE_TAG);
+			return new FMTokenNode("TAG_CLOSE_CLOSE", name, offset, line, column);
+		}
+
+	TAG_CLOSE =
+		&{return (checkState(State.STATE_TAG))}
+		name:">"
+		{
+			popState(State.STATE_TAG);
+			return new FMTokenNode("TAG_CLOSE", name, offset, line, column);
+		}
+		
+	TAG_CLOSE_SELF =
+		&{return (checkState(State.STATE_TAG))}
+		name:"/>"
+		{
+			popState(State.STATE_TAG);
+			return new FMTokenNode("TAG_CLOSE_SELF", name, offset, line, column);
+		}
+
+	STRING_START = 
+		&{return (checkSuperState(State.STATE_TAG) && !checkState(State.STATE_STRING))}
+		r:("r")? quote:("'"/'"')
+		{
+			pushState(State.STATE_STRING);
+			peekState().stringType = quote;
+			var rawChar = (typeof r != "undefined")? r : "";
+			return new TokenNode("STRING_START", rawChar + quote, offset, line, column);
+		}
+
+	STRING_END = 
+		&{return checkState(State.STATE_STRING)}
+		quote:("'"/'"')
+		{
+			if (peekState().stringType == quote) {
+				popState(State.STATE_STRING);
+				return new TokenNode("STRING_END", quote, offset, line, column);
+			}
+			else {
+				return null; // Our string is of the other kind.
+			}
+		}
+
+	STRING_SEQ_MATCH = 
+		&{return checkState(State.STATE_STRING)} 
+		a:STRING_MATCH+
+		{
+			var node = new TokenNode("STRING_SEQ_MATCH", a.join(""), offset, line, column);
+			return node;
+		}
+
+	STRING_MATCH = 
+		a:(/*!'"' !"'"*/ !ESCAPED_CHAR !'\n' .)
+		{
+			var matchedChar = a.join("");
+			if (peekState().stringType != matchedChar) {
+				return matchedChar;
+			}
+			else {
+				return null;
+			}
+		}
+
+	ESCAPED_CHAR = 
+		&{return checkState(State.STATE_STRING)} 
+		esc:"\\" 
+		escSeq:(
+			("n" / "t" / "r" / "f" / "b" / "g" / "l" / "a" / "\\" / "'" / "\"" / "$" / "{") 
+			/
+			("x" ([0-9] / [A-F] / [a-f]))
+		)
+		{
+			if (typeof escSeq == "object") {
+				escSeq = escSeq.join("");
+			}
+			return new TokenNode("ESCAPED_CHAR", esc + escSeq, offset, line, column);
+		}
+
+	NATURAL_GT =
+		&{return (checkState(State.STATE_PAREN))}
+		name:">"
+		{
+			return new TokenNode("NATURAL_GT", name, offset, line, column);
+		}
+
+	NATURAL_GTE =
+		&{return (checkState(State.STATE_PAREN))}
+		name:">="
+		{
+			return new TokenNode("NATURAL_GTE", name, offset, line, column);
+		}
+
+	DOUBLE_EQUALS =
+		name:"=="
+		{
+			return new TokenNode("DOUBLE_EQUALS", name, offset, line, column);
+		}
+
+	EQUALS =
+		name:"="
+		{
+			return new TokenNode("EQUALS", name, offset, line, column);
+		}
+
+	LESS_THAN =
+		name:("lt" / "<" /*/ "&lt;" / "\\lt"*/)
+		{
+			return new TokenNode("LESS_THAN", name, offset, line, column);
+		}
+
+	LESS_THAN_EQUALS =
+		name:("lte" / "<=" /*/ "&lt;=" / "\\lte"*/)
+		{
+			return new TokenNode("LESS_THAN_EQUALS", name, offset, line, column);
+		}
+
+	ESCAPED_GT =
+		name:("gt" /*/ "&gt;"/ "\\gt"*/)
+		{
+			return new TokenNode("ESCAPED_GT", name, offset, line, column);
+		}
+
+	ESCAPED_GTE =
+		name:("gte" /*/ "\\gte" / "&gt;="*/)
+		{
+			return new TokenNode("ESCAPED_GTE", name, offset, line, column);
+		}
+
+	OPEN_PAREN =
+		name:"("
+		{
+			pushState(State.STATE_PAREN);
+			return new TokenNode("OPEN_PAREN", name, offset, line, column);
+		}
+
+	CLOSE_PAREN =
+		&{return (checkState(State.STATE_PAREN))}
+		name:")"
+		{
+			popState(State.STATE_PAREN);
+			return new TokenNode("CLOSE_PAREN", name, offset, line, column);
+		}
+
+	OPEN_BRACKET =
+		name:"["
+		{
+			pushState(State.STATE_BRACKET);
+			return new TokenNode("OPEN_BRACKET", name, offset, line, column);
+		}
+
+	CLOSE_BRACKET =
+		&{return (checkState(State.STATE_BRACKET))}
+		name:"]"
+		{
+			popState(State.STATE_BRACKET);
+			return new TokenNode("CLOSE_BRACKET", name, offset, line, column);
+		}
+
+	OPEN_BRACE =
+		name:"{"
+		{
+			pushState(State.STATE_BRACE);
+			return new TokenNode("OPEN_BRACE", name, offset, line, column);
+		}
+
+	CLOSE_BRACE =
+		&{return (checkState(State.STATE_BRACE))}
+		name:"}"
+		{
+			popState(State.STATE_BRACE);
+			return new TokenNode("CLOSE_BRACE", name, offset, line, column);
+		}
+
+	COMMA =
+		name:","
+		{
+			return new TokenNode("COMMA", name, offset, line, column);
+		}
+	SEMICOLON =
+		name:";"
+		{
+			return new TokenNode("SEMICOLON", name, offset, line, column);
+		}
+
+	COLON =
+		name:":"
+		{
+			return new TokenNode("COLON", name, offset, line, column);
+		}
+
+	DOT =
+		name:"."
+		{
+			return new TokenNode("DOT", name, offset, line, column);
+		}
+
+	DOT_DOT =
+		name:".."
+		{
+			return new TokenNode("DOT_DOT", name, offset, line, column);
+		}
+
+	NOT_EQUALS =
+		name:"!="
+		{
+			return new TokenNode("NOT_EQUALS", name, offset, line, column);
+		}
+
+	EXCLAM =
+		name:"!"
+		{
+			return new TokenNode("EXCLAM", name, offset, line, column);
+		}
+
+	PLUS =
+		name:"+"
+		{
+			return new TokenNode("PLUS", name, offset, line, column);
+		}
+
+	MINUS =
+		name:"-"
+		{
+			return new TokenNode("MINUS", name, offset, line, column);
+		}
+
+	DOUBLE_STAR =
+		name:"**"
+		{
+			return new TokenNode("DOUBLE_STAR", name, offset, line, column);
+		}
+
+	TIMES =
+		name:"*"
+		{
+			return new TokenNode("TIMES", name, offset, line, column);
+		}
+
+	DIVIDE =
+		name:"/"
+		{
+			return new TokenNode("DIVIDE", name, offset, line, column);
+		}
+
+	PERCENT =
+		name:"%"
+		{
+			return new TokenNode("PERCENT", name, offset, line, column);
+		}
+
+	BUILT_IN =
+		name:"?"
+		{
+			return new TokenNode("BUILT_IN", name, offset, line, column);
+		}
+
+	EXISTS =
+		name:"??"
+		{
+			return new TokenNode("EXISTS", name, offset, line, column);
+		}
+
+		AND =
+		name:("&&" / "&")
+		{
+			return new TokenNode("AND", name, offset, line, column);
+		}
+
+	OR =
+		name:("||" / "|")
+		{
+			return new TokenNode("OR", name, offset, line, column);
+		}
+
+	IN =
+		name:"in" ![a-zA_Z0-9] 
+		{
+			return new TokenNode("IN", name, offset, line, column);
+		}
+
+	AS =
+		name:"as" ![a-zA_Z0-9]
+		{
+			return new TokenNode("AS", name, offset, line, column);
+		}
+
+	USING =
+		name:"using" ![a-zA_Z0-9]
+		{
+			return new TokenNode("USING", name, offset, line, column);
+		}
+
+	FALSE =
+		name:"false" ![a-zA_Z0-9]
+		{
+			return new TokenNode("FALSE", name, offset, line, column);
+		}
+
+	TRUE =
+		name:"true" ![a-zA_Z0-9]
+		{
+			return new TokenNode("TRUE", name, offset, line, column);
+		}
+	
+	// FRAGMENTS
+	
+	// TODO, _ and . are not letters.
+	// This allows . starting IDENTIFIERs...
+	LETTER =
+		letter:[a-zA-Z_.]
+		{
+			return letter;
+		}
+
+	DIGIT =
+		digit:[0-9]
+		{
+			return digit;
+		}
+
+	NEWLINE =
+		value:("\r"? "\n")
+		{
+			return new TokenNode("NEWLINE", value.join(""), offset, line, column);
+		}
+
+	PCDATA =
+		&{return (checkState(State.STATE_PCDATA))}
+		pcdata:PCDATA_CHAR+
+		{
+			return new TokenNode("PCDATA", pcdata.join(""), offset, line, column);
+		}
+
+	PCDATA_CHAR =
+		b:(!'<#' !"<#--" !'</#' !'${' !'\n' .)
+		{
+			return b.join("");
+		}
+
+	NUMBER_LITERAL "NUMBER_LITERAL" =
+		num:(DECIMAL / INTEGER)
+		{
+			return new TokenNode("NUMBER_LITERAL", num.text, offset, line, column);
+		}
+	
+	DECIMAL =
+		inta:INTEGER dot:'.' intb:INTEGER
+		{
+			return new TokenNode("DECIMAL", inta.text + dot + intb.text, offset, line, column);
+		}
+
+	INTEGER =
+		digits:DIGIT+
+		{
+			return new TokenNode("INTEGER", digits.join(""), offset, line, column);
+		}
+
+	WSOPT =
+		whitespace:([\t ]*)
+		{
+			return new TokenNode("WS", whitespace.join(""), offset, line, column);
+		}
+		
+	WS = 
+		whitespace:([\t ]+)
+		{
+			return new TokenNode("WS", whitespace.join(""), offset, line, column);
+		}
+
+	ANY_CHAR =
+		name:.
+		{
+			return new TokenNode("ANY_CHAR", name, offset, line, column);
+		}
