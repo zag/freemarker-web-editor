@@ -1,5 +1,5 @@
-FreeMarkerWebEditor
-===================
+freemarker-web-editor
+=====================
 
 A web based FreeMarker editor.
 
